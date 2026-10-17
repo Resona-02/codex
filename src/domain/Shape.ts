@@ -35,6 +35,14 @@ export abstract class Shape {
   }
 
   setAttribute(attribute: string, value: string): void {
+    // 内联 CSS 的优先级高于 SVG 属性；此阶段不引入 CSS 解析与改写。
+    if (this.#importedAttributes.has("style")) {
+      throw new Error(`cannot set attributes on a shape with inline style: ${this.id}`);
+    }
+    this.applyAttribute(attribute, value);
+  }
+
+  private applyAttribute(attribute: string, value: string): void {
     if (attribute === "fill") this.#fill = value;
     else if (attribute === "stroke") this.#stroke = value;
     else if (attribute === "stroke-width") {
@@ -62,7 +70,7 @@ export abstract class Shape {
     for (const [attribute, value] of Object.entries(attributes)) {
       if (attribute === "id") continue;
       if (Object.hasOwn(geometry, attribute) || ["fill", "stroke", "stroke-width"].includes(attribute)) {
-        this.setAttribute(attribute, value);
+        this.applyAttribute(attribute, value);
       } else {
         this.#importedAttributes.set(attribute, value);
       }

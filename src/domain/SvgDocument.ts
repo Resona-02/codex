@@ -17,6 +17,7 @@ export class SvgDocument {
       viewBox: `0 0 ${width} ${height}`,
       ...attributes,
     };
+    if (this.#rootAttributes.id !== undefined) Validator.id(this.#rootAttributes.id);
   }
 
   get root(): Group { return this.#root; }
@@ -49,12 +50,15 @@ export class SvgDocument {
 
   ensureAvailableId(id: string): void {
     Validator.id(id);
-    if (this.allShapes().some(shape => shape.id === id)) throw new Error(`id already exists: ${id}`);
+    if (this.#rootAttributes.id === id || this.allShapes().some(shape => shape.id === id)) {
+      throw new Error(`id already exists: ${id}`);
+    }
   }
 
   add(shape: Shape, parentId?: string): void {
     const parent = parentId === undefined ? this.#root : this.findContainer(parentId);
     const existingIds = new Set(this.allShapes().map(existing => existing.id));
+    if (this.#rootAttributes.id !== undefined) existingIds.add(this.#rootAttributes.id);
     const pending = [shape];
     while (pending.length > 0) {
       const candidate = pending.pop()!;
@@ -97,6 +101,27 @@ export class SvgDocument {
     const group = this.find(id).asContainer();
     const parent = group.parent!;
     if (parent === this.#root) throw new Error(`cannot ungroup top-level container: ${id}`);
+    const attributes = group.attributes();
+    const inheritedStyles = ["fill", "stroke", "stroke-width"];
+    const unsupported = Object.keys(attributes).find(attribute =>
+      attribute !== "id" && !inheritedStyles.includes(attribute) && !attribute.startsWith("data-"));
+    if (unsupported !== undefined) {
+      throw new Error(`cannot ungroup container with unsupported attribute: ${id} (${unsupported})`);
+    }
+    const updates = group.children.map(child => {
+      const ownAttributes = child.attributes();
+      const inherited = inheritedStyles.filter(attribute =>
+        attributes[attribute] !== undefined && (ownAttributes[attribute] === undefined ||
+          ["inherit", "unset"].includes(ownAttributes[attribute]!.trim())));
+      if (ownAttributes.style !== undefined && inheritedStyles.some(attribute => attributes[attribute] !== undefined)) {
+        throw new Error(`cannot ungroup container with an inline-styled child: ${id} (${child.id})`);
+      }
+      return { child, inherited };
+    });
+    // 摘掉 g 前先落实其可安全继承的样式，避免改变提升后子节点的外观。
+    for (const { child, inherited } of updates) {
+      for (const attribute of inherited) child.setAttribute(attribute, attributes[attribute]!);
+    }
     const index = parent.remove(group);
     for (const [offset, child] of group.children.entries()) parent.insert(child, index + offset);
   }

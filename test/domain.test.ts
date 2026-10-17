@@ -63,6 +63,42 @@ test("numeric validation prevents invalid dimensions and partial leaf operations
   }
 });
 
+test("all numeric entry points use finite decimal, floating point or exponent notation", () => {
+  const factory = new ShapeFactory();
+  const rect = factory.create("rect", "r", ["+.5", "-1.", "2E+2", "3e-1"]);
+  assert.equal(rect.attributes().x, "0.5");
+  assert.equal(rect.attributes().y, "-1");
+  assert.equal(rect.attributes().width, "200");
+  assert.equal(rect.attributes().height, "0.3");
+  for (const value of ["0x10", "0b10", "0o10", "", " ", " 1", "1 ", "Infinity", "1e309"]) {
+    assert.throws(() => factory.create("circle", "c", [value, "0", "1"]), /invalid number/);
+    assert.throws(() => rect.setAttribute("x", value), /invalid number/);
+  }
+  assert.equal(rect.attributes().x, "0.5");
+});
+
+test("inline styles survive import and cloning, while set refuses misleading CSS overrides", () => {
+  const factory = new ShapeFactory();
+  const rect = factory.fromSvg("rect", "r", {
+    style: "fill:blue", x: "1", y: "2", width: "3", height: "4", fill: "red",
+  }, "");
+  assert.equal(rect.attributes().fill, "red");
+  assert.equal(rect.attributes().style, "fill:blue");
+  assert.deepEqual(rect.clone().attributes(), rect.attributes());
+  for (const attribute of ["fill", "x", "stroke-width"]) {
+    assert.throws(() => rect.setAttribute(attribute, "5"),
+      /cannot set attributes on a shape with inline style: r/);
+  }
+  rect.move(1, 2);
+  rect.scale(2);
+  assert.equal(rect.attributes().x, "4");
+  assert.equal(rect.attributes().y, "8");
+  assert.equal(rect.attributes().fill, "red");
+  const text = factory.fromSvg("text", "t", { style: "fill:blue" }, "old");
+  assert.throws(() => text.setAttribute("text", "new"), /cannot set attributes on a shape with inline style: t/);
+  assert.equal(text.text, "old");
+});
+
 test("Composite applies move, scale and inheritance styles to nested groups", () => {
   const outer = new Group("outer");
   const inner = new Group("inner");
@@ -150,6 +186,63 @@ test("ungroup lifts nested children into the original position; top-level is pro
   assert.throws(() => document.ungroup("outer"), /cannot ungroup top-level container: outer/);
 });
 
+test("ungroup preserves inherited styles and each child's own explicit styles", () => {
+  const document = new SvgDocument();
+  document.add(new Group("outer"));
+  document.add(new Group("inner"), "outer");
+  const inner = document.find("inner");
+  inner.setAttribute("fill", "red");
+  inner.setAttribute("stroke", "black");
+  inner.setAttribute("stroke-width", "2");
+  document.add(new Rect("plain", 0, 0, 10, 10), "inner");
+  document.add(new Rect("own", 0, 0, 10, 10, "blue"), "inner");
+  document.find("own").setAttribute("stroke-width", "5");
+  document.add(new Group("nested"), "inner");
+  document.add(new Rect("descendant", 0, 0, 1, 1), "nested");
+  document.add(new Rect("inherited", 0, 0, 1, 1, "inherit"), "inner");
+  document.ungroup("inner");
+  assert.equal(document.find("plain").attributes().fill, "red");
+  assert.equal(document.find("plain").attributes().stroke, "black");
+  assert.equal(document.find("plain").attributes()["stroke-width"], "2");
+  assert.equal(document.find("own").attributes().fill, "blue");
+  assert.equal(document.find("own").attributes()["stroke-width"], "5");
+  assert.equal(document.find("nested").attributes().fill, "red");
+  assert.equal(document.find("descendant").attributes().fill, undefined);
+  assert.equal(document.find("inherited").attributes().fill, "red");
+  assert.deepEqual(document.find("outer").children.map(shape => shape.id), ["plain", "own", "nested", "inherited"]);
+});
+
+test("ungroup rejects complex imported container attributes before changing the tree or styles", () => {
+  for (const attribute of ["transform", "style", "opacity", "filter", "clip-path", "font-size", "class"]) {
+    const document = new SvgDocument();
+    document.add(new Group("outer"));
+    const inner = new Group("inner");
+    inner.setAttribute("fill", "red");
+    inner.importAttributes({ [attribute]: "value" });
+    document.add(inner, "outer");
+    document.add(new Rect("r", 0, 0, 10, 10), "inner");
+    assert.throws(() => document.ungroup("inner"), /cannot ungroup container with unsupported attribute: inner/);
+    assert.equal(document.find("r").parent, inner);
+    assert.equal(document.find("r").attributes().fill, undefined);
+    assert.equal(document.count(), 3);
+  }
+});
+
+test("ungroup rejects inline-styled children if inheritance cannot be preserved without CSS parsing", () => {
+  const document = new SvgDocument();
+  document.add(new Group("outer"));
+  document.add(new Group("inner"), "outer");
+  document.find("inner").setAttribute("fill", "red");
+  document.add(new Rect("first", 0, 0, 1, 1), "inner");
+  const styled = new Rect("styled", 0, 0, 1, 1, "blue");
+  styled.importAttributes({ style: "fill:inherit" });
+  document.add(styled, "inner");
+  assert.throws(() => document.ungroup("inner"), /cannot ungroup container with an inline-styled child: inner \(styled\)/);
+  assert.equal(document.find("first").attributes().fill, undefined);
+  assert.equal(document.find("first").parent?.id, "inner");
+  assert.equal(document.find("styled").parent?.id, "inner");
+});
+
 test("front/back and reparent affect only sibling ordering", () => {
   const document = new SvgDocument();
   document.add(new Group("g"));
@@ -174,6 +267,21 @@ test("document enforces ids including subtrees and validates targets before muta
   assert.throws(() => document.add(new Group("new"), "r"), /not a container: r/);
   assert.throws(() => document.group("r", ["missing"]), /id already exists: r/);
   assert.throws(() => document.find("__svg_root__"), /no such shape: __svg_root__/);
+});
+
+test("an imported root SVG id remains reserved for later creation and grouping", () => {
+  const document = new SvgDocument(100, 100, { id: "drawing" });
+  document.add(new Rect("r", 0, 0, 1, 1));
+  assert.throws(() => document.ensureAvailableId("drawing"), /id already exists: drawing/);
+  assert.throws(() => document.add(new Group("drawing")), /id already exists: drawing/);
+  assert.throws(() => document.group("drawing", ["r"]), /id already exists: drawing/);
+  const subtree = new Group("g");
+  subtree.insert(new Rect("drawing", 0, 0, 1, 1));
+  assert.throws(() => document.add(subtree), /id already exists: drawing/);
+  assert.equal(document.count(), 1);
+  assert.equal(document.find("r").parent, document.root);
+  assert.equal(document.clone().rootAttributes().id, "drawing");
+  assert.throws(() => document.clone().add(new Group("drawing")), /id already exists: drawing/);
 });
 
 test("clones are independent snapshots, retaining parents, metadata and document dimensions", () => {

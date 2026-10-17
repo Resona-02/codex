@@ -1,7 +1,9 @@
 /** 集中表达数值约束；几何行为仍由各图形自己负责。 */
 export class Validator {
   static number(value: string): number {
-    if (value.trim() === "") throw new Error(`invalid number: ${value}`);
+    if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(value)) {
+      throw new Error(`invalid number: ${value}`);
+    }
     return this.finite(Number(value));
   }
 
