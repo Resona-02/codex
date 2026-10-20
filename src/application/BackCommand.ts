@@ -1,19 +1,12 @@
 import { EditCommand } from './EditCommand.js';
-import type { EditorSession } from './EditorSession.js';
+import type { EditReceiver } from './EditReceiver.js';
 
 export class BackCommand extends EditCommand {
-  constructor(session: EditorSession, private readonly id: string) {
-    super(session);
+  constructor(receiver: EditReceiver, private readonly id: string) {
+    super(receiver);
   }
 
-  protected override apply(): string {
-    this.document.back(this.id);
-    const shape = this.document.find(this.id);
-    return `${shape.tag}#${shape.id} moved to back`;
-  }
-
-  protected override undoMessage(): string {
-    const shape = this.document.find(this.id);
-    return `${shape.tag}#${shape.id} order restored`;
+  override execute(): string {
+    return this.receiver.back(this.state, this.id);
   }
 }

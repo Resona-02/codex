@@ -1,9 +1,11 @@
 import type { Shape } from '../domain/Shape.js';
-import type { SvgDocument } from '../domain/SvgDocument.js';
+import type { EditorSession } from './EditorSession.js';
 
 /** 通过统一的 Shape 接口渲染，不按图形类型分派。 */
-export class TreeView {
-  tree(document: SvgDocument, id?: string): string {
+export class ViewReceiver {
+  constructor(private readonly session: EditorSession) {}
+  tree(id?: string): string {
+    const document = this.session.document;
     const lines: string[] = [];
     if (id !== undefined) {
       const shape = document.find(id);
@@ -16,7 +18,8 @@ export class TreeView {
     return lines.join('\n');
   }
 
-  show(document: SvgDocument, id: string): string {
+  show(id: string): string {
+    const document = this.session.document;
     const shape = document.find(id);
     const parent = shape.parent === document.root ? 'svg' : `g#${shape.parent?.id}`;
     const lines = [`${shape.tag}#${shape.id}  parent=${parent}`];

@@ -1,4 +1,5 @@
-import { ShapeFactory } from '../domain/ShapeFactory.js';
+import { EditReceiver } from './EditReceiver.js';
+import { CommandExecutor } from './CommandExecutor.js';
 import { SvgDocument } from '../domain/SvgDocument.js';
 import type { DocumentStore } from './DocumentStore.js';
 import type { EditCommand } from './EditCommand.js';
@@ -9,7 +10,8 @@ export class EditorSession {
   private current?: SvgDocument;
   private path?: string;
   private readonly commandHistory = new History();
-  private readonly shapeFactory = new ShapeFactory();
+  private readonly commandExecutor = new CommandExecutor(this.commandHistory);
+  private readonly editReceiver = new EditReceiver(this);
 
   constructor(private readonly store: DocumentStore) {}
 
@@ -22,8 +24,12 @@ export class EditorSession {
     return this.commandHistory;
   }
 
-  get factory(): ShapeFactory {
-    return this.shapeFactory;
+  get executor(): CommandExecutor {
+    return this.commandExecutor;
+  }
+
+  get edits(): EditReceiver {
+    return this.editReceiver;
   }
 
   async init(width = 800, height = 600): Promise<string> {
@@ -56,16 +62,14 @@ export class EditorSession {
     if (width === undefined || height === undefined) {
       throw new Error('canvas requires width and height');
     }
-    const resized = document.clone();
-    resized.resize(width, height);
-    this.current = resized;
+    document.resize(width, height);
     this.commandHistory.barrier();
-    return `canvas resized to ${resized.width}x${resized.height}`;
+    return `canvas resized to ${document.width}x${document.height}`;
   }
 
   execute(command: EditCommand): string {
     this.document;
-    return this.commandHistory.execute(command);
+    return this.executor.executeCommand(command);
   }
 
   undo(): string {
@@ -76,11 +80,6 @@ export class EditorSession {
   redo(): string {
     this.document;
     return this.commandHistory.redo();
-  }
-
-  /** 仅供命令恢复快照；普通编辑必须经过 execute。 */
-  replaceDocument(document: SvgDocument): void {
-    this.current = document;
   }
 
   private commitDocument(document: SvgDocument, path?: string): void {

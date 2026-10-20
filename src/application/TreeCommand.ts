@@ -1,0 +1,10 @@
+import type { Command } from './Command.js';
+import type { ViewReceiver } from './ViewReceiver.js';
+
+export class TreeCommand implements Command {
+  constructor(private readonly receiver: ViewReceiver, private readonly id?: string) {}
+
+  execute(): string {
+    return this.receiver.tree(this.id);
+  }
+}

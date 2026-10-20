@@ -1,20 +1,13 @@
 import { EditCommand } from './EditCommand.js';
-import type { EditorSession } from './EditorSession.js';
+import type { EditReceiver } from './EditReceiver.js';
 
 export class GroupCommand extends EditCommand {
-  private readonly ids: readonly string[];
-
-  constructor(session: EditorSession, private readonly newId: string, ids: readonly string[]) {
-    super(session);
+  constructor(receiver: EditReceiver, private readonly newId: string, private readonly ids: readonly string[]) {
+    super(receiver);
     this.ids = [...ids];
   }
 
-  protected override apply(): string {
-    this.document.group(this.newId, [...this.ids]);
-    return `g#${this.newId} created with ${this.ids.length} children`;
-  }
-
-  protected override undoMessage(): string {
-    return `g#${this.newId} grouping undone`;
+  override execute(): string {
+    return this.receiver.group(this.state, this.newId, this.ids);
   }
 }

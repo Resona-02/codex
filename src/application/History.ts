@@ -1,6 +1,6 @@
 import type { EditCommand } from './EditCommand.js';
 
-/** Invoker：只记录成功命令，失败时保留撤销和重做栈。 */
+/** 执行器使用的命令栈：成功后才迁移记录，失败时保留两个栈。 */
 export class History {
   private readonly undoStack: EditCommand[] = [];
   private readonly redoStack: EditCommand[] = [];
@@ -36,7 +36,7 @@ export class History {
     this.assertAllowed();
     const command = this.redoStack.at(-1);
     if (!command) throw new Error('nothing to redo');
-    const result = command.redo();
+    const result = command.execute();
     this.redoStack.pop();
     this.undoStack.push(command);
     return result;

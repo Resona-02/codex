@@ -34,27 +34,27 @@ function state(session: EditorSession): string {
 async function fixture(): Promise<EditorSession> {
   const session = new EditorSession(new MemoryDocumentStore());
   await session.init();
-  session.execute(new CreateCommand(session, 'g', 'scene', []));
-  session.execute(new CreateCommand(session, 'g', 'nested', [], 'scene'));
-  session.execute(new CreateCommand(session, 'rect', 'r', ['10', '20', '30', '40', 'red'], 'nested'));
-  session.execute(new CreateCommand(session, 'circle', 'c', ['50', '60', '5'], 'nested'));
-  session.execute(new CreateCommand(session, 'text', 't', ['80', '90', '原始文字'], 'scene'));
+  session.execute(new CreateCommand(session.edits, 'g', 'scene', []));
+  session.execute(new CreateCommand(session.edits, 'g', 'nested', [], 'scene'));
+  session.execute(new CreateCommand(session.edits, 'rect', 'r', ['10', '20', '30', '40', 'red'], 'nested'));
+  session.execute(new CreateCommand(session.edits, 'circle', 'c', ['50', '60', '5'], 'nested'));
+  session.execute(new CreateCommand(session.edits, 'text', 't', ['80', '90', '原始文字'], 'scene'));
   return session;
 }
 
 test('every concrete edit command restores the complete document and redoes it', async t => {
   const cases = [
-    { name: 'create', command: (s: EditorSession) => new CreateCommand(s, 'ellipse', 'e', ['1', '2', '3', '4'], 'scene') },
-    { name: 'delete subtree', command: (s: EditorSession) => new DeleteCommand(s, 'nested') },
-    { name: 'move container', command: (s: EditorSession) => new MoveCommand(s, 'nested', 5, -2) },
-    { name: 'scale container', command: (s: EditorSession) => new ScaleCommand(s, 'nested', 1.5) },
-    { name: 'set geometry', command: (s: EditorSession) => new SetCommand(s, 'r', 'width', '100') },
-    { name: 'set Chinese text', command: (s: EditorSession) => new SetCommand(s, 't', 'text', '新文字 & "value"') },
-    { name: 'group', command: (s: EditorSession) => new GroupCommand(s, 'selected', ['r', 'c']) },
-    { name: 'ungroup', command: (s: EditorSession) => new UngroupCommand(s, 'nested') },
-    { name: 'addto', command: (s: EditorSession) => new AddToCommand(s, 'nested', 't') },
-    { name: 'front', command: (s: EditorSession) => new FrontCommand(s, 'r') },
-    { name: 'back', command: (s: EditorSession) => new BackCommand(s, 'c') },
+    { name: 'create', command: (s: EditorSession) => new CreateCommand(s.edits, 'ellipse', 'e', ['1', '2', '3', '4'], 'scene') },
+    { name: 'delete subtree', command: (s: EditorSession) => new DeleteCommand(s.edits, 'nested') },
+    { name: 'move container', command: (s: EditorSession) => new MoveCommand(s.edits, 'nested', 5, -2) },
+    { name: 'scale container', command: (s: EditorSession) => new ScaleCommand(s.edits, 'nested', 1.5) },
+    { name: 'set geometry', command: (s: EditorSession) => new SetCommand(s.edits, 'r', 'width', '100') },
+    { name: 'set Chinese text', command: (s: EditorSession) => new SetCommand(s.edits, 't', 'text', '新文字 & "value"') },
+    { name: 'group', command: (s: EditorSession) => new GroupCommand(s.edits, 'selected', ['r', 'c']) },
+    { name: 'ungroup', command: (s: EditorSession) => new UngroupCommand(s.edits, 'nested') },
+    { name: 'addto', command: (s: EditorSession) => new AddToCommand(s.edits, 'nested', 't') },
+    { name: 'front', command: (s: EditorSession) => new FrontCommand(s.edits, 'r') },
+    { name: 'back', command: (s: EditorSession) => new BackCommand(s.edits, 'c') },
   ];
   for (const item of cases) {
     await t.test(item.name, async () => {
@@ -74,12 +74,12 @@ test('every concrete edit command restores the complete document and redoes it',
   }
 });
 
-test('snapshots stay independent across several undo and redo steps', async () => {
+test('local undo records stay independent across several undo and redo steps', async () => {
   const session = await fixture();
   const original = state(session);
-  session.execute(new MoveCommand(session, 'r', 10, 20));
+  session.execute(new MoveCommand(session.edits, 'r', 10, 20));
   const moved = state(session);
-  session.execute(new SetCommand(session, 'r', 'fill', 'blue'));
+  session.execute(new SetCommand(session.edits, 'r', 'fill', 'blue'));
   const recolored = state(session);
   session.undo();
   assert.equal(state(session), moved);
@@ -93,19 +93,19 @@ test('snapshots stay independent across several undo and redo steps', async () =
 
 test('failed edits preserve document, undo history and pending redo', async () => {
   const session = await fixture();
-  session.execute(new MoveCommand(session, 'r', 5, 6));
+  session.execute(new MoveCommand(session.edits, 'r', 5, 6));
   session.undo();
   const before = state(session);
   const undoCount = session.history.undoCount;
   const failures = [
-    new CreateCommand(session, 'rect', 'r', ['0', '0', '10', '10']),
-    new CreateCommand(session, 'circle', 'new', ['0', '0', '10'], 'missing'),
-    new SetCommand(session, 'r', 'unknown', 'x'),
-    new ScaleCommand(session, 'nested', 0),
-    new GroupCommand(session, 'bad', ['nested', 'r']),
-    new AddToCommand(session, 'nested', 'scene'),
-    new UngroupCommand(session, 'scene'),
-    new DeleteCommand(session, 'missing'),
+    new CreateCommand(session.edits, 'rect', 'r', ['0', '0', '10', '10']),
+    new CreateCommand(session.edits, 'circle', 'new', ['0', '0', '10'], 'missing'),
+    new SetCommand(session.edits, 'r', 'unknown', 'x'),
+    new ScaleCommand(session.edits, 'nested', 0),
+    new GroupCommand(session.edits, 'bad', ['nested', 'r']),
+    new AddToCommand(session.edits, 'nested', 'scene'),
+    new UngroupCommand(session.edits, 'scene'),
+    new DeleteCommand(session.edits, 'missing'),
   ];
   for (const command of failures) {
     assert.throws(() => session.execute(command));
@@ -119,9 +119,9 @@ test('failed edits preserve document, undo history and pending redo', async () =
 
 test('a successful edit after undo clears redo and operates on the restored document', async () => {
   const session = await fixture();
-  session.execute(new MoveCommand(session, 'r', 5, 6));
+  session.execute(new MoveCommand(session.edits, 'r', 5, 6));
   session.undo();
-  session.execute(new SetCommand(session, 'r', 'fill', 'blue'));
+  session.execute(new SetCommand(session.edits, 'r', 'fill', 'blue'));
   assert.equal(session.document.find('r').attributes().x, '10');
   assert.equal(session.document.find('r').attributes().fill, 'blue');
   assert.equal(session.history.redoCount, 0);
@@ -130,11 +130,11 @@ test('a successful edit after undo clears redo and operates on the restored docu
 
 test('a container edit rolls back children already changed before a later child fails', async () => {
   const session = await fixture();
-  session.execute(new SetCommand(session, 'c', 'cx', '1e308'));
+  session.execute(new SetCommand(session.edits, 'c', 'cx', '1e308'));
   const before = state(session);
   const count = session.history.undoCount;
   // r 的缩放先成功，随后 c 的数值溢出；命令必须整体回滚。
-  assert.throws(() => session.execute(new ScaleCommand(session, 'nested', 2)), /invalid number/);
+  assert.throws(() => session.execute(new ScaleCommand(session.edits, 'nested', 2)), /invalid number/);
   assert.equal(state(session), before);
   assert.equal(session.history.undoCount, count);
   session.undo();
@@ -153,9 +153,9 @@ test('canvas query preserves history; successful resize establishes the IO barri
   assert.equal(session.history.redoCount, 0);
   assert.throws(() => session.undo(), /undo not allowed after io command/);
   assert.throws(() => session.redo(), /undo not allowed after io command/);
-  assert.throws(() => session.execute(new DeleteCommand(session, 'missing')));
+  assert.throws(() => session.execute(new DeleteCommand(session.edits, 'missing')));
   assert.throws(() => session.undo(), /undo not allowed after io command/);
-  session.execute(new MoveCommand(session, 'r', 1, 0));
+  session.execute(new MoveCommand(session.edits, 'r', 1, 0));
   session.undo();
   assert.equal(session.document.find('r').attributes().x, '10');
 });
@@ -181,7 +181,7 @@ test('init and read establish barriers; read forwards warnings and remembers the
   store.seed('input.svg', imported, ['warning: assigned id rect1 to unnamed <rect>']);
   assert.equal(await session.read('input.svg'), 'warning: assigned id rect1 to unnamed <rect>\nread input.svg (0 elements)');
   assert.throws(() => session.redo(), /undo not allowed after io command/);
-  session.execute(new CreateCommand(session, 'g', 'new', []));
+  session.execute(new CreateCommand(session.edits, 'g', 'new', []));
   assert.equal(await session.save(), 'saved to input.svg (1 elements)');
   assert.equal((await store.read('input.svg')).document.count(), 1);
   assert.throws(() => session.undo(), /undo not allowed after io command/);
@@ -191,10 +191,10 @@ test('failed file operations preserve the document, path and both history stacks
   const store = new MemoryDocumentStore();
   const session = new EditorSession(store);
   await session.init();
-  session.execute(new CreateCommand(session, 'g', 'g1', []));
+  session.execute(new CreateCommand(session.edits, 'g', 'g1', []));
   await session.save('original.svg');
-  session.execute(new CreateCommand(session, 'g', 'g2', []));
-  session.execute(new MoveCommand(session, 'g1', 10, 20));
+  session.execute(new CreateCommand(session.edits, 'g', 'g2', []));
+  session.execute(new MoveCommand(session.edits, 'g1', 10, 20));
   session.undo();
   const before = state(session);
   store.rejectWrites(true);
@@ -212,7 +212,7 @@ test('init clears the remembered save path, and failed pathless save leaves edit
   await session.init();
   await session.save('old.svg');
   await session.init();
-  session.execute(new CreateCommand(session, 'g', 'g', []));
+  session.execute(new CreateCommand(session.edits, 'g', 'g', []));
   await assert.rejects(session.save(), /no file path/);
   session.undo();
   assert.equal(session.document.count(), 0);
@@ -225,6 +225,6 @@ test('every document-dependent operation requires init or read first', async () 
   assert.throws(() => session.canvas(), message);
   assert.throws(() => session.undo(), message);
   assert.throws(() => session.redo(), message);
-  assert.throws(() => session.execute(new CreateCommand(session, 'g', 'g', [])), message);
+  assert.throws(() => session.execute(new CreateCommand(session.edits, 'g', 'g', [])), message);
   await assert.rejects(session.save('test.svg'), message);
 });

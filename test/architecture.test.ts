@@ -23,7 +23,7 @@ test('imports follow the documented dependency directions', () => {
     domain: ['domain'],
     application: ['application', 'domain'],
     infrastructure: ['infrastructure', 'application', 'domain'],
-    cli: ['cli', 'application', 'domain'],
+    cli: ['cli', 'application'],
   };
   const files = readdirSync('src', { recursive: true }).map(String).filter(file => file.endsWith('.ts'));
   for (const file of files) {
@@ -40,5 +40,19 @@ test('imports follow the documented dependency directions', () => {
         assert.fail(`${file} must not import external/IO module ${specifier}`);
       }
     }
+  }
+});
+
+test('command execute and undo methods only forward to their receiver', () => {
+  const files = readdirSync('src/application').filter(file => file.endsWith('Command.ts') && file !== 'Command.ts');
+  for (const file of files) {
+    const source = readFileSync(join('src/application', file), 'utf8');
+    const methods = [...source.matchAll(/^\s+(?:override )?(?:execute|undo)\(\): [^{]+\{([^}]+)\}/gm)];
+    assert.ok(methods.length > 0, `${file}: must expose a forwarding method`);
+    for (const [, body] of methods) {
+      assert.match(body.trim(), /^return this\.receiver\.\w+\([^;]*\);$/, `${file}: delegate only`);
+    }
+    assert.doesNotMatch(source, /\b(?:if|for|while|switch|try)\s*[({]|\.(?:clone|find|setAttribute)\(/,
+      `${file}: business rules and state restoration belong to receivers`);
   }
 });

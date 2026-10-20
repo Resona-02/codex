@@ -1,17 +1,12 @@
 import { EditCommand } from './EditCommand.js';
-import type { EditorSession } from './EditorSession.js';
+import type { EditReceiver } from './EditReceiver.js';
 
 export class UngroupCommand extends EditCommand {
-  constructor(session: EditorSession, private readonly id: string) {
-    super(session);
+  constructor(receiver: EditReceiver, private readonly id: string) {
+    super(receiver);
   }
 
-  protected override apply(): string {
-    this.document.ungroup(this.id);
-    return `g#${this.id} ungrouped`;
-  }
-
-  protected override undoMessage(): string {
-    return `g#${this.id} restored`;
+  override execute(): string {
+    return this.receiver.ungroup(this.state, this.id);
   }
 }

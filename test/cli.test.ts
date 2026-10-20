@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import { EditorSession } from '../src/application/EditorSession.js';
 import { SvgFileStore } from '../src/infrastructure/SvgFileStore.js';
+import { CommandFactory } from '../src/cli/CommandFactory.js';
 import { CommandDispatcher } from '../src/cli/CommandDispatcher.js';
 import { Tokenizer } from '../src/cli/Tokenizer.js';
 import { Cli } from '../src/cli/Cli.js';
@@ -26,7 +27,7 @@ test('tokenization preserves colors, Chinese, quoted in, empty text and escaped 
 
 test('CLI errors use the prescribed messages and keep state and history intact', async () => {
   const session = new EditorSession(new MemoryDocumentStore());
-  const cli = new CommandDispatcher(session);
+  const cli = new CommandDispatcher(new CommandFactory(session), session.executor);
   assert.equal(await cli.execute('tree'), "error: no document. use 'init' or 'read' first");
   await cli.execute('init');
   await cli.execute('create rect r 0 0 20 10');
@@ -51,7 +52,7 @@ test('CLI errors use the prescribed messages and keep state and history intact',
 
 test('quoted text and creation suffixes work for every built-in type', async () => {
   const session = new EditorSession(new MemoryDocumentStore());
-  const cli = new CommandDispatcher(session);
+  const cli = new CommandDispatcher(new CommandFactory(session), session.executor);
   for (const line of [
     'init 400 300', 'create g scene', 'create g nested in scene',
     'create rect r 1.5 2 20 10 #ffffff in scene', 'create circle c 10 10 5 in scene',
@@ -72,7 +73,7 @@ test('quoted text and creation suffixes work for every built-in type', async () 
 
 test('invalid syntax, quote and numeric errors neither edit nor consume redo', async () => {
   const session = new EditorSession(new MemoryDocumentStore());
-  const cli = new CommandDispatcher(session);
+  const cli = new CommandDispatcher(new CommandFactory(session), session.executor);
   await cli.execute('init');
   await cli.execute('create circle c 0 0 2');
   await cli.execute('move c 4 5');
@@ -88,7 +89,7 @@ test('invalid syntax, quote and numeric errors neither edit nor consume redo', a
 
 test('display and comments preserve history while successful IO establishes a barrier', async () => {
   const session = new EditorSession(new MemoryDocumentStore());
-  const cli = new CommandDispatcher(session);
+  const cli = new CommandDispatcher(new CommandFactory(session), session.executor);
   await cli.execute('init');
   await cli.execute('create circle c 0 0 2');
   for (const line of ['tree', 'show c', 'help', 'canvas', '# ignored', '']) await cli.execute(line);
@@ -107,7 +108,8 @@ test('display and comments preserve history while successful IO establishes a ba
 test('assignment session saves, imports and keeps all seven imported shapes', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'svg-cli-'));
   try {
-    const cli = new CommandDispatcher(new EditorSession(new SvgFileStore()));
+    const session = new EditorSession(new SvgFileStore());
+    const cli = new CommandDispatcher(new CommandFactory(session), session.executor);
     const lines = [
       'init 800 600', 'create rect bg 0 0 800 600 #ffffff', 'create text title 20 40 "My Diagram"',
       'create circle c1 100 100 20 red', 'create rect box 200 80 60 60 #3366ff',
@@ -132,7 +134,8 @@ test('assignment session saves, imports and keeps all seven imported shapes', as
 });
 
 test('piped CLI continues after an error, handles EOF and emits no interactive prompts', async () => {
-  const dispatcher = new CommandDispatcher(new EditorSession(new MemoryDocumentStore()));
+  const session = new EditorSession(new MemoryDocumentStore());
+  const dispatcher = new CommandDispatcher(new CommandFactory(session), session.executor);
   let output = '';
   const destination = new Writable({ write(chunk, _encoding, callback) { output += chunk.toString(); callback(); } });
   await new Cli(dispatcher, Readable.from(['init\n', 'move missing 0 0\n', 'create circle c 1 2 3\n', 'tree\n']), destination).run();

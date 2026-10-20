@@ -64,6 +64,29 @@ export abstract class Shape {
     return attributes;
   }
 
+  /** 只记本次目标及其后代的几何字段，直接恢复旧值以避免反向计算误差。 */
+  rememberGeometry(): () => void {
+    const geometry = this.geometryAttributes();
+    const children = this.children.map(child => child.rememberGeometry());
+    return () => {
+      for (const [attribute, value] of Object.entries(geometry)) {
+        this.setGeometryAttribute(attribute, value);
+      }
+      for (const restore of children) restore();
+    };
+  }
+
+  /** 只记一个属性；可恢复“原本未设置”的样式，且不受导入 CSS 限制。 */
+  rememberAttribute(attribute: string): () => void {
+    const value = attribute === "text" ? this.text : this.attributes()[attribute];
+    return () => {
+      if (attribute === "fill") this.#fill = value;
+      else if (attribute === "stroke") this.#stroke = value;
+      else if (attribute === "stroke-width") this.#strokeWidth = value === undefined ? undefined : Number(value);
+      else if (value !== undefined) this.setGeometryAttribute(attribute, value);
+    };
+  }
+
   /** 保留导入文件的视觉属性，但不扩大 CLI set 白名单。 */
   importAttributes(attributes: Readonly<Record<string, string>>): void {
     const geometry = this.geometryAttributes();

@@ -1,49 +1,16 @@
-import type { SvgDocument } from '../domain/SvgDocument.js';
-import type { EditorSession } from './EditorSession.js';
+import type { Command } from './Command.js';
+import type { EditReceiver } from './EditReceiver.js';
+import { UndoState } from './UndoState.js';
 
-/**
- * Command 的模板方法：子类表达操作，基类统一保证原子性和撤销粒度。
- * 快照保留整棵 Composite 树，复杂分组也只占一个历史单元。
- */
-export abstract class EditCommand {
-  private before?: SvgDocument;
-  private after?: SvgDocument;
-  private result = '';
+/** 命令只绑定接收者和请求参数。旧状态由接收者填写，命令不解释它。 */
+export abstract class EditCommand implements Command {
+  protected readonly state = new UndoState();
 
-  constructor(protected readonly session: EditorSession) {}
+  constructor(protected readonly receiver: EditReceiver) {}
 
-  protected get document(): SvgDocument {
-    return this.session.document;
-  }
-
-  execute(): string {
-    if (this.after) throw new Error('command already executed');
-    const before = this.document.clone();
-    try {
-      const result = this.apply();
-      const after = this.document.clone();
-      this.before = before;
-      this.after = after;
-      this.result = result;
-      return result;
-    } catch (error) {
-      this.session.replaceDocument(before);
-      throw error;
-    }
-  }
+  abstract execute(): string;
 
   undo(): string {
-    if (!this.before) throw new Error('command has not been executed');
-    this.session.replaceDocument(this.before.clone());
-    return this.undoMessage();
+    return this.receiver.undo(this.state);
   }
-
-  redo(): string {
-    if (!this.after) throw new Error('command has not been executed');
-    this.session.replaceDocument(this.after.clone());
-    return this.result;
-  }
-
-  protected abstract apply(): string;
-  protected abstract undoMessage(): string;
 }
