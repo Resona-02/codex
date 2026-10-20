@@ -23,6 +23,7 @@ import { RedoCommand } from '../application/RedoCommand.js';
 import { TreeCommand } from '../application/TreeCommand.js';
 import { ShowCommand } from '../application/ShowCommand.js';
 import { HelpCommand } from '../application/HelpCommand.js';
+import { HelpReceiver } from '../application/HelpReceiver.js';
 
 interface CommandEntry {
   readonly syntax: string;
@@ -104,7 +105,7 @@ export class CommandFactory implements CommandSource {
     });
     this.register('help', 'help', args => {
       args.expect(0);
-      return new HelpCommand(this);
+      return new HelpCommand(new HelpReceiver([...this.entries.values()].map(entry => entry.syntax)));
     });
     this.register('undo', 'undo', args => {
       args.expect(0);
@@ -122,10 +123,6 @@ export class CommandFactory implements CommandSource {
     const entry = this.entries.get(tokens[0].value);
     if (!entry) throw new Error(`unknown command: ${tokens[0].value}`);
     return entry.create(new CommandArguments(tokens.slice(1), entry.syntax));
-  }
-
-  help(): string {
-    return [...this.entries.values()].map(entry => entry.syntax).join('\n');
   }
 
   private register(name: string, syntax: string, create: CommandEntry['create']): void {

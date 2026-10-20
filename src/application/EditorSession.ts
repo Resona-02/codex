@@ -20,7 +20,7 @@ export class EditorSession {
     return this.current;
   }
 
-  get history(): History {
+  get history(): Readonly<Pick<History, 'undoCount' | 'redoCount'>> {
     return this.commandHistory;
   }
 
@@ -74,12 +74,12 @@ export class EditorSession {
 
   undo(): string {
     this.document;
-    return this.commandHistory.undo();
+    return this.executor.undo();
   }
 
   redo(): string {
     this.document;
-    return this.commandHistory.redo();
+    return this.executor.redo();
   }
 
   private commitDocument(document: SvgDocument, path?: string): void {

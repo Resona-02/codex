@@ -1,45 +1,44 @@
 import type { EditCommand } from './EditCommand.js';
 
-/** 执行器使用的命令栈：成功后才迁移记录，失败时保留两个栈。 */
+/** 只保存命令和迁移两个栈；不调用命令，执行时序由 CommandExecutor 负责。 */
 export class History {
   private readonly undoStack: EditCommand[] = [];
   private readonly redoStack: EditCommand[] = [];
   private blocked = false;
 
-  get undoCount(): number {
-    return this.undoStack.length;
-  }
+  get undoCount(): number { return this.undoStack.length; }
+  get redoCount(): number { return this.redoStack.length; }
 
-  get redoCount(): number {
-    return this.redoStack.length;
-  }
-
-  execute(command: EditCommand): string {
-    const result = command.execute();
+  recordExecuted(command: EditCommand): void {
     this.undoStack.push(command);
     this.redoStack.length = 0;
     this.blocked = false;
-    return result;
   }
 
-  undo(): string {
+  peekUndo(): EditCommand {
     this.assertAllowed();
     const command = this.undoStack.at(-1);
     if (!command) throw new Error('nothing to undo');
-    const result = command.undo();
-    this.undoStack.pop();
-    this.redoStack.push(command);
-    return result;
+    return command;
   }
 
-  redo(): string {
+  peekRedo(): EditCommand {
     this.assertAllowed();
     const command = this.redoStack.at(-1);
     if (!command) throw new Error('nothing to redo');
-    const result = command.execute();
+    return command;
+  }
+
+  recordUndone(command: EditCommand): void {
+    if (this.peekUndo() !== command) throw new Error('undo history changed during execution');
+    this.undoStack.pop();
+    this.redoStack.push(command);
+  }
+
+  recordRedone(command: EditCommand): void {
+    if (this.peekRedo() !== command) throw new Error('redo history changed during execution');
     this.redoStack.pop();
     this.undoStack.push(command);
-    return result;
   }
 
   barrier(): void {

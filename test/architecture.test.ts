@@ -56,3 +56,16 @@ test('command execute and undo methods only forward to their receiver', () => {
       `${file}: business rules and state restoration belong to receivers`);
   }
 });
+
+test('History stores commands but only CommandExecutor invokes historical commands', () => {
+  const history = readFileSync('src/application/History.ts', 'utf8');
+  assert.doesNotMatch(history, /command\.(?:execute|undo)\(/, 'the stack must not act as the executor');
+  const session = readFileSync('src/application/EditorSession.ts', 'utf8');
+  assert.doesNotMatch(session, /commandHistory\.(?:execute|undo|redo|record\w*)\(/,
+    'the business session may establish a barrier, but must delegate command execution');
+  for (const file of ['CommandDispatcher.ts', 'Cli.ts']) {
+    const source = readFileSync(join('src/cli', file), 'utf8');
+    assert.doesNotMatch(source, /EditorSession|EditReceiver|SvgDocument|new \w+Command\(/,
+      `${file}: input handling must not bind or use business receivers`);
+  }
+});
