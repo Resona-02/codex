@@ -4,7 +4,7 @@
 
 高级软件开发 Lab1 Phase 1，TypeScript 实现，支持 `rect / circle / ellipse / line / text / g`、组合编辑和撤销重做。
 
-- GitHub：[Resona-02/svgsoftwarelab1](https://github.com/Resona-02/svgsoftwarelab1)
+- GitHub：[Resona-02/svg_software_lab1](https://github.com/Resona-02/svg_software_lab1)
 - **最新实现请看 main**；`final` 是最初验收版本，早于本次 Command 重构。
 - 本文件与 `doc/README.md` 内容一致。
 
@@ -13,8 +13,8 @@
 需要 Node.js 22 或更新版本：
 
 ```sh
-git clone git@github.com:Resona-02/svgsoftwarelab1.git
-cd svgsoftwarelab1
+git clone git@github.com:Resona-02/svg_software_lab1.git
+cd svg_software_lab1
 npm ci
 npm run cli
 ```
