@@ -40,7 +40,7 @@ export class EditReceiver {
   move(state: UndoState, id: string, dx: number, dy: number): string {
     const shape = this.document.find(id);
     return state.run(() => {
-      state.record(shape.rememberGeometry());
+      state.record(shape.rememberPosition());
       shape.move(dx, dy);
       return `${shape.summary()} moved by (${dx},${dy})`;
     }, () => `${shape.summary()} moved back by (${-dx},${-dy})`);

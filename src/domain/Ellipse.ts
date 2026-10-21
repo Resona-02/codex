@@ -25,6 +25,15 @@ export class Ellipse extends Shape {
     this.#cy = cy;
   }
 
+  override rememberPosition(): () => void {
+    const cx = this.#cx;
+    const cy = this.#cy;
+    return () => {
+      this.#cx = cx;
+      this.#cy = cy;
+    };
+  }
+
   override scale(factor: number): void {
     Validator.scale(factor);
     const values = [this.#cx, this.#cy, this.#rx, this.#ry]

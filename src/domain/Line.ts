@@ -31,6 +31,19 @@ export class Line extends Shape {
     this.#y2 = y2;
   }
 
+  override rememberPosition(): () => void {
+    const x1 = this.#x1;
+    const y1 = this.#y1;
+    const x2 = this.#x2;
+    const y2 = this.#y2;
+    return () => {
+      this.#x1 = x1;
+      this.#y1 = y1;
+      this.#x2 = x2;
+      this.#y2 = y2;
+    };
+  }
+
   override scale(factor: number): void {
     Validator.scale(factor);
     const values = [this.#x1, this.#y1, this.#x2, this.#y2]

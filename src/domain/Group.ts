@@ -43,6 +43,13 @@ export class Group extends Shape {
     for (const shape of this.#children) shape.move(dx, dy);
   }
 
+  override rememberPosition(): () => void {
+    const restorations = this.#children.map(child => child.rememberPosition());
+    return () => {
+      for (const restore of restorations) restore();
+    };
+  }
+
   override scale(factor: number): void {
     Validator.scale(factor);
     for (const shape of this.#children) shape.scale(factor);

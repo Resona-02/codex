@@ -23,6 +23,8 @@ export abstract class Shape {
 
   abstract move(dx: number, dy: number): void;
   abstract scale(factor: number): void;
+  /** 移动撤销只保留旧坐标；各图形封装自己的位置字段。 */
+  abstract rememberPosition(): () => void;
   abstract clone(): Shape;
   protected abstract geometryAttributes(): Record<string, string>;
   protected abstract setGeometryAttribute(attribute: string, value: string): boolean;

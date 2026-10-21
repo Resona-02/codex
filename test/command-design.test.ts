@@ -16,7 +16,6 @@ import { BackCommand } from '../src/application/BackCommand.js';
 import { CommandFactory } from '../src/cli/CommandFactory.js';
 import { CommandDispatcher } from '../src/cli/CommandDispatcher.js';
 import { SvgDocument } from '../src/domain/SvgDocument.js';
-import { Shape } from '../src/domain/Shape.js';
 import { Rect } from '../src/domain/Rect.js';
 import { SvgCodec } from '../src/infrastructure/SvgCodec.js';
 import { MemoryDocumentStore } from './helpers/MemoryDocumentStore.js';
@@ -120,7 +119,7 @@ test('redo invokes the receiver again; repeated undo restores exact values witho
 test('one-shape edits record only that shape even in a large document', async t => {
   const session = await fixture();
   for (let i = 0; i < 1000; i++) session.document.add(new Rect(`unrelated${i}`, 0, 0, 1, 1));
-  const capture = t.mock.method(Shape.prototype, 'rememberGeometry');
+  const capture = t.mock.method(Rect.prototype, 'rememberPosition');
   const target = session.document.find('r0');
   for (let i = 0; i < 100; i++) session.execute(new MoveCommand(session.edits, 'r0', 1, 1));
   assert.equal(capture.mock.callCount(), 100);

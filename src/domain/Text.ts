@@ -23,6 +23,15 @@ export class Text extends Shape {
     this.#y = y;
   }
 
+  override rememberPosition(): () => void {
+    const x = this.#x;
+    const y = this.#y;
+    return () => {
+      this.#x = x;
+      this.#y = y;
+    };
+  }
+
   override scale(factor: number): void {
     Validator.scale(factor);
     const x = Validator.finite(this.#x * factor);
