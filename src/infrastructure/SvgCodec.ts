@@ -38,7 +38,10 @@ export class SvgCodec {
     for (const [name, value] of Object.entries(document.rootAttributes())) root.setAttribute(name, value);
     for (const shape of document.root.children) this.appendShape(xml, root, shape, 1);
     if (document.root.children.length > 0) root.appendChild(xml.createTextNode('\n'));
-    return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(xml)}\n`;
+    const encoded = `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(xml)}\n`;
+    // Validate every serialized value before SvgFileStore creates or replaces a file.
+    this.validateXmlCharacters(encoded);
+    return encoded;
   }
 
   private parseXml(xml: string): Document {
@@ -57,10 +60,7 @@ export class SvgCodec {
       const code = match[1]!.startsWith('x') ? parseInt(match[1]!.slice(1), 16) : Number(match[1]);
       if (!this.isXmlCharacter(code)) throw new Error('invalid SVG: invalid XML character reference');
     }
-    for (const character of xml) {
-      const code = character.codePointAt(0)!;
-      if (!this.isXmlCharacter(code)) throw new Error('invalid SVG: invalid XML character');
-    }
+    this.validateXmlCharacters(xml);
     try {
       return new DOMParser({
         onError: () => { throw new Error('malformed XML'); },
@@ -165,6 +165,14 @@ export class SvgCodec {
     return code === 9 || code === 10 || code === 13 ||
       (code >= 32 && code <= 0xd7ff) || (code >= 0xe000 && code <= 0xfffd) ||
       (code >= 0x10000 && code <= 0x10ffff);
+  }
+
+  private validateXmlCharacters(value: string): void {
+    for (const character of value) {
+      if (!this.isXmlCharacter(character.codePointAt(0)!)) {
+        throw new Error('invalid SVG: invalid XML character');
+      }
+    }
   }
 
   private readAttributes(element: Element): Record<string, string> {

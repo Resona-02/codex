@@ -3,6 +3,10 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mock, test } from 'node:test';
+import { CreateCommand } from '../src/application/CreateCommand.js';
+import { EditorSession } from '../src/application/EditorSession.js';
+import { MoveCommand } from '../src/application/MoveCommand.js';
+import { SetCommand } from '../src/application/SetCommand.js';
 import { ShapeFactory } from '../src/domain/ShapeFactory.js';
 import { SvgDocument } from '../src/domain/SvgDocument.js';
 import { SvgCodec } from '../src/infrastructure/SvgCodec.js';
@@ -37,11 +41,12 @@ test('duplicate, empty and whitespace-containing ids are rejected before importi
   assert.throws(() => codec.decode('<svg><rect id="a b"/></svg>'), /id must not be empty/);
 });
 
-test('Chinese, significant text spaces and XML special characters survive serialization', () => {
+test('Chinese, supplementary Unicode, whitespace and XML special characters survive serialization', () => {
   const factory = new ShapeFactory();
   const document = new SvgDocument(320, 240);
-  const content = '  开始 & <处理> "引号" \'单引号\'  ';
-  document.add(factory.fromSvg('text', 'title', { x: '12.5', y: '40', 'data-note': '甲 & "乙" <丙>' }, content));
+  const content = '  开始 😀 𠮷 & <处理> "引号" \'单引号\'\t\n  ';
+  const note = '甲 😀 & "乙" <丙>\t\n\r';
+  document.add(factory.fromSvg('text', 'title', { x: '12.5', y: '40', 'data-note': note }, content));
   const codec = new SvgCodec();
   const encoded = codec.encode(document);
   assert.match(encoded, /&amp;/);
@@ -49,7 +54,29 @@ test('Chinese, significant text spaces and XML special characters survive serial
   assert.match(encoded, /&quot;/);
   const imported = codec.decode(encoded).document;
   assert.equal(imported.root.children[0]!.text, content);
-  assert.equal(imported.root.children[0]!.attributes()['data-note'], '甲 & "乙" <丙>');
+  assert.equal(imported.root.children[0]!.attributes()['data-note'], note);
+});
+
+test('encoding rejects forbidden XML characters in text, ids and every attribute level', () => {
+  const factory = new ShapeFactory();
+  const codec = new SvgCodec();
+  for (const invalid of ['\u0000', '\u0001', '\u000b', '\u001f', '\ud800', '\udc00', '\ufffe', '\uffff']) {
+    const text = new SvgDocument();
+    text.add(factory.create('text', 'title', ['0', '0', `before${invalid}after`]));
+    const attribute = new SvgDocument();
+    attribute.add(factory.fromSvg('rect', 'r', { 'data-note': invalid }, ''));
+    const nestedAttribute = new SvgDocument();
+    nestedAttribute.add(factory.create('g', 'container', []));
+    nestedAttribute.add(factory.fromSvg('rect', 'r', { fill: invalid }, ''), 'container');
+    const id = new SvgDocument();
+    // Some controls are valid non-whitespace model ids, but are never legal in XML.
+    if (!/\s/.test(invalid)) id.add(factory.create('g', `id${invalid}`, []));
+    const rootAttribute = new SvgDocument(800, 600, { 'data-note': invalid });
+    for (const document of [text, attribute, nestedAttribute, rootAttribute]) {
+      assert.throws(() => codec.encode(document), /invalid SVG: invalid XML character/);
+    }
+    if (id.count() > 0) assert.throws(() => codec.encode(id), /invalid SVG: invalid XML character/);
+  }
 });
 
 test('SVG defaults are retained by omitting fill and stroke attributes', () => {
@@ -160,4 +187,33 @@ test('serialization failure cannot truncate the previous file', async t => {
   await assert.rejects(new SvgFileStore(codec).write(path, new SvgDocument()), /serialization failed/);
   assert.equal(await readFile(path, 'utf8'), 'previous content');
   assert.deepEqual(await readdir(directory), ['existing.svg']);
+});
+
+test('invalid XML cannot replace a saved file or discard its session history and path', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'svg-editor-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, 'existing.svg');
+  const session = new EditorSession(new SvgFileStore());
+  await session.init();
+  await session.execute(new CreateCommand(session.edits, 'text', 'title', ['10', '20', 'original']));
+  await session.save(path);
+  const original = await readFile(path, 'utf8');
+  await session.execute(new SetCommand(session.edits, 'title', 'text', 'invalid\u0001text'));
+  await session.execute(new MoveCommand(session.edits, 'title', 5, 6));
+  await session.undo();
+
+  for (const target of [path, join(directory, 'failed.svg')]) {
+    await assert.rejects(session.save(target), /invalid SVG: invalid XML character/);
+    assert.equal(await readFile(path, 'utf8'), original);
+    assert.deepEqual(await readdir(directory), ['existing.svg']);
+    assert.equal(session.document.find('title').text, 'invalid\u0001text');
+    assert.equal(session.document.find('title').attributes().x, '10');
+    assert.equal(session.history.undoCount, 1);
+    assert.equal(session.history.redoCount, 1);
+  }
+
+  await session.undo();
+  assert.equal(session.document.find('title').text, 'original');
+  assert.equal(await session.save(), `saved to ${path} (1 elements)`);
+  assert.equal(await readFile(path, 'utf8'), original);
 });
