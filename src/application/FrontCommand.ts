@@ -6,6 +6,10 @@ export class FrontCommand extends EditCommand {
     super(receiver);
   }
 
+  override newExecution(): FrontCommand {
+    return new FrontCommand(this.receiver, this.id);
+  }
+
   override execute(): string {
     return this.receiver.front(this.state, this.id);
   }

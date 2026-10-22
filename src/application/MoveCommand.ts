@@ -6,6 +6,10 @@ export class MoveCommand extends EditCommand {
     super(receiver);
   }
 
+  override newExecution(): MoveCommand {
+    return new MoveCommand(this.receiver, this.id, this.dx, this.dy);
+  }
+
   override execute(): string {
     return this.receiver.move(this.state, this.id, this.dx, this.dy);
   }

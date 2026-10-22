@@ -6,6 +6,10 @@ export class ScaleCommand extends EditCommand {
     super(receiver);
   }
 
+  override newExecution(): ScaleCommand {
+    return new ScaleCommand(this.receiver, this.id, this.factor);
+  }
+
   override execute(): string {
     return this.receiver.scale(this.state, this.id, this.factor);
   }

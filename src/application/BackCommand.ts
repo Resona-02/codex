@@ -6,6 +6,10 @@ export class BackCommand extends EditCommand {
     super(receiver);
   }
 
+  override newExecution(): BackCommand {
+    return new BackCommand(this.receiver, this.id);
+  }
+
   override execute(): string {
     return this.receiver.back(this.state, this.id);
   }

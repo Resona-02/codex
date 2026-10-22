@@ -6,6 +6,10 @@ export class AddToCommand extends EditCommand {
     super(receiver);
   }
 
+  override newExecution(): AddToCommand {
+    return new AddToCommand(this.receiver, this.groupId, this.id);
+  }
+
   override execute(): string {
     return this.receiver.addTo(this.state, this.groupId, this.id);
   }

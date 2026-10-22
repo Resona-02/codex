@@ -7,6 +7,10 @@ export class GroupCommand extends EditCommand {
     this.ids = [...ids];
   }
 
+  override newExecution(): GroupCommand {
+    return new GroupCommand(this.receiver, this.newId, this.ids);
+  }
+
   override execute(): string {
     return this.receiver.group(this.state, this.newId, this.ids);
   }

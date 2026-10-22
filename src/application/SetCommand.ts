@@ -6,6 +6,10 @@ export class SetCommand extends EditCommand {
     super(receiver);
   }
 
+  override newExecution(): SetCommand {
+    return new SetCommand(this.receiver, this.id, this.attribute, this.value);
+  }
+
   override execute(): string {
     return this.receiver.set(this.state, this.id, this.attribute, this.value);
   }

@@ -8,6 +8,10 @@ export class CreateCommand extends EditCommand {
     this.params = [...params];
   }
 
+  override newExecution(): CreateCommand {
+    return new CreateCommand(this.receiver, this.type, this.id, this.params, this.parentId);
+  }
+
   override execute(): string {
     return this.receiver.create(this.state, this.type, this.id, this.params, this.parentId);
   }

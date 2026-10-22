@@ -6,6 +6,10 @@ export class DeleteCommand extends EditCommand {
     super(receiver);
   }
 
+  override newExecution(): DeleteCommand {
+    return new DeleteCommand(this.receiver, this.id);
+  }
+
   override execute(): string {
     return this.receiver.delete(this.state, this.id);
   }

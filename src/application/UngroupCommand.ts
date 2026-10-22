@@ -6,6 +6,10 @@ export class UngroupCommand extends EditCommand {
     super(receiver);
   }
 
+  override newExecution(): UngroupCommand {
+    return new UngroupCommand(this.receiver, this.id);
+  }
+
   override execute(): string {
     return this.receiver.ungroup(this.state, this.id);
   }
