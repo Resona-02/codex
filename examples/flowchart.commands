@@ -1,5 +1,5 @@
 # 两节点流程图：容器和叶子共享编辑操作。
-init 800 600
+init 800 240
 create g flowchart
 create g node1 in flowchart
 create rect start 120 100 160 60 #4a90d9 in node1

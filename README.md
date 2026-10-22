@@ -6,9 +6,9 @@
 
 - GitHub：[Resona-02/svg_software_lab1](https://github.com/Resona-02/svg_software_lab1)
 - **最新实现请看 main**；`final` 是最初验收版本，早于本次 Command 重构。
-- 本文件与 `doc/README.md` 内容一致。
+- 根目录与 `doc/` 目录均提供本说明。
 
-## 2. 运行方法
+## 2. 启动与验收
 
 需要 Node.js 22 或更新版本：
 
@@ -30,11 +30,24 @@ redo
 save demo.svg
 ```
 
-保存的 SVG 可用浏览器打开。脚本回放：`npm run cli < examples/flowchart.commands`。
+保存的 SVG 可用浏览器打开。运行类型检查和自动测试：
+
+```sh
+npm run check
+npm test
+```
+
+### Demo 预览
+
+下面的流程图由程序执行示例命令后保存为 SVG，可直接在 README 中预览：
+
+![SVG 编辑器生成的两节点流程图](examples/flowchart.svg)
+
+复现：`npm run cli < examples/flowchart.commands`。示例包含创建图形、嵌套分组、移动、撤销及修改文字；[查看命令脚本](examples/flowchart.commands) · [查看 SVG](examples/flowchart.svg)。
 
 ## 3. Command 如何体现在各模块中
 
-**入口请求执行，命令只转发，接收者完成业务。** 按课程 Command 讲义第 12、16–21、24 页的分工设计：
+**入口请求执行，命令只转发，接收者完成业务。** 各模块的职责如下：
 
 | 模块 / 类 | 职责与设计理由 |
 | --- | --- |
@@ -72,7 +85,7 @@ return this.receiver.move(this.state, this.id, this.dx, this.dy);
 @enduml
 ```
 
-课件的“三种入口”指主菜单、右键菜单、工具栏。本阶段交付 CLI；`CommandTrigger` 只持有 `Command` 和执行器，测试用三个触发器模拟这三种入口，共用一个 SaveCommand。未实现 GUI 界面。
+本阶段交付 CLI；`CommandTrigger` 只持有 `Command` 和执行器，测试用三个触发器模拟主菜单、右键菜单和工具栏，共用一个 SaveCommand。未实现 GUI 界面。
 
 **撤销只记录本次操作需要的旧状态，不保存整份文档或执行后快照：**
 
@@ -85,18 +98,13 @@ return this.receiver.move(this.state, this.id, this.dx, this.dy);
 | group / ungroup | 受影响节点的旧父节点、旧下标；解组另记录直接子节点可能改变的继承样式 |
 | addto / front / back | 被移动节点的旧父节点、旧下标 |
 
-**栈时序：** 新编辑执行成功后 push 到 undo 并清空 redo；undo 取最近命令调用 undo，成功后从 undo 转入 redo；redo 取最近命令再次 execute，成功后从 redo 转回 undo。课件第 22–24 页画的是先 push/pop 再调用；这里先 peek、操作成功再迁移，保持成功后的栈状态一致并避免失败命令污染历史。
+**栈时序：** 新编辑执行成功后 push 到 undo 并清空 redo；undo 取最近命令调用 undo，成功后从 undo 转入 redo；redo 取最近命令再次 execute，成功后从 redo 转回 undo。先 peek 查看栈顶，操作成功后再迁移，避免失败命令污染历史。
 
 失败时逆序执行本条编辑的局部恢复操作；成功后才入历史。undo 后的新编辑清空 redo。成功 init/read/save 或调整画布尺寸按作业要求清空并锁定历史，下一次成功编辑解锁；查询不入栈。保存文件时的临时文档副本用于隔离写入，不进入撤销历史。
 
 历史内存随**实际受影响的数据量**增长；移动仅保留旧坐标数值，不记录尺寸、样式或文字，也不建立几何属性字典。例如矩形移动从记录 x/y/width/height 减少为 x/y。删除大子树仍需保留该子树，整体移动大组仍需记住各节点的旧坐标。新增编辑时添加接收者方法、薄命令类和工厂注册即可；新增图形通过 Shape 子类和 ShapeFactory 扩展。
 
-## 4. 测试如何推动改进
-
-```sh
-npm run check
-npm test
-```
+## 4. 测试与修改记录
 
 2026-10-21 验证：类型检查通过，**86 项测试通过，0 项失败**；模块依赖检查与命令转发约束通过。
 
@@ -111,4 +119,4 @@ npm test
 | 跨父节点分组、解组继承样式、浮点值恢复、编辑及重做中途溢出 | 验证原位置与属性精确恢复、失败原子性及两个历史栈保持正确 |
 | 根 id 冲突、非法数值、中文与 XML、文件写入失败 | 保留原有修复与回归测试，确保重构不破坏既有功能 |
 
-用户提出课件与内存约束后，AI 对照讲义重构；再次严格审查发现帮助命令仍依赖 Client、History 混合执行职责，现已分离并补充时序测试，Git 保留修改记录。当前不是完整 SVG/CSS 引擎，不实现本阶段之外的 box 和插件加载器。GitHub Actions 使用同样的类型检查和测试，远程结果以 Actions 页面为准。
+主要修改：将业务编排移入接收者；将 execute/undo/redo 调用集中到执行器；为帮助命令提供独立接收者；将整份文档快照改为局部撤销记录，并进一步让移动只保存旧坐标。各次修改均补充回归测试，Git 保留提交记录。当前不是完整 SVG/CSS 引擎，不实现本阶段之外的 box 和插件加载器。GitHub Actions 使用同样的类型检查和测试，远程结果以 Actions 页面为准。

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 240" width="800" height="240">
   <g id="flowchart">
     <g id="node1">
       <rect id="start" x="120" y="100" width="160" height="60" fill="#4a90d9"/>
